@@ -33,16 +33,20 @@ data_transforms = {
     ]),
 }
 
+batch_size = 2
+
 data_dir = 'data/test_me'
 image_datasets = {x: datasets.ImageFolder(os.path.join(data_dir, x),
                                           data_transforms[x])
                   for x in ['train', 'val']}
 dataloaders = {x: torch.utils.data.DataLoader(image_datasets[x],
-                                              batch_size=4,
+                                              batch_size=batch_size,
                                               shuffle=True)
                for x in ['train', 'val']}
 dataset_sizes = {x: len(image_datasets[x]) for x in ['train', 'val']}
 class_names = image_datasets['train'].classes
+
+cn = len(class_names)
 
 
 def imshow(inp, title=None):
@@ -64,12 +68,72 @@ inputs, classes = next(iter(dataloaders['train']))
 # Make a grid from batch
 out = utils.make_grid(inputs)
 
-model_ft = InceptionResnetV1(
-    pretrained='vggface2', classify=False, num_classes=len(class_names))
+IRV1 = InceptionResnetV1(
+    pretrained='vggface2', classify=True, num_classes=cn)
 
-for name, module in model_ft.named_children():
-    print(name)
-layer_list = list(model_ft.children())[-5:]
-model_ft = nn.Sequential(*list(model_ft.children())[:-5])
+layer_list = list(IRV1.children())[-5:]
+IRV1 = nn.Sequential(*list(IRV1.children())[:-5])
 
-print(layer_list)
+for param in IRV1.parameters():
+    param.requires_grad = False
+
+
+class Flatten(nn.Module):
+    def __init__(self):
+        super(Flatten, self).__init__()
+
+    def forward(self, x):
+        x = x.view(x.size(0), -1)
+        return x
+
+
+class normalize(nn.Module):
+    def __init__(self):
+        super(normalize, self).__init__()
+
+    def forward(self, x):
+        x = F.normalize(x, p=2, dim=1)
+        return x
+
+
+# class NEWRES(nn.Module):
+#     def __init__(self):
+#         super(NEWRES, self).__init__
+#         self.layer0 = nn.Sequential(*list(IRV1.children())[:-5])
+#         self.layer1 = nn.Sequential(
+#             nn.AdaptiveAvgPool2d(output_size=1),
+#             nn.Dropout(0.6, inplace=False),
+#             nn.Linear(1792, 512, bias=False),
+#             nn.BatchNorm1d(512, eps=0.001, momentum=0.1, affine=True),
+#             nn.Linear(512, cn)
+#         )
+
+#     def forward(self, x):
+#         out = self.layer0(x)
+#         out = out.view(batch_size, -1)
+#         out = self.layer1(out)
+#         return out
+
+IRV1.avgpool_1a = nn.AdaptiveAvgPool2d(output_size=1)
+IRV1.dropout = nn.Dropout(0.6)
+IRV1.last_linear = nn.Sequential(
+    Flatten(),
+    nn.Linear(in_features=1792, out_features=512, bias=False),
+)
+IRV1.last_bn = nn.BatchNorm1d(
+    512, eps=0.001, momentum=0.1, affine=True)
+IRV1.logits = nn.Linear(layer_list[4].in_features, len(class_names))
+IRV1.softmax = nn.Softmax(dim=1)
+
+for params in IRV1.parameters():
+    print(params.requires_grad)
+
+# # # for name, module in model_ft.named_children():
+# # #     print(name)
+
+# # # print(model_ft)
+
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+IRV1 = IRV1.to(device)
+for name, module in IRV1.named_children():
+    print(module)
