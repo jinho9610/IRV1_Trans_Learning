@@ -84,11 +84,12 @@ IRV1.dropout = nn.Dropout(0.6)
 IRV1.last_linear = nn.Sequential(
     Flatten(),
     nn.Linear(in_features=1792, out_features=512, bias=False),
+    nn.ReLU()
 )
 IRV1.last_bn = nn.BatchNorm1d(
     512, eps=0.001, momentum=0.1, affine=True)
 IRV1.logits = nn.Linear(layer_list[4].in_features, len(class_names))
-IRV1.softmax = nn.Softmax(dim=1)
+#IRV1.softmax = nn.Softmax(dim=1)
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 IRV1 = IRV1.to(device)
@@ -155,9 +156,9 @@ def train_model(model, criterion, optimizer, scheduler,
 
 
 IRV1, FT_losses = train_model(
-    IRV1, criterion, optimizer_ft, exp_lr_scheduler, num_epochs=50)
+    IRV1, criterion, optimizer_ft, exp_lr_scheduler, num_epochs=10)
 
-torch.save(IRV1, 'finetuned_IRV1.pt')
+torch.save(IRV1, '4no_softmax_finetuned_IRV1.pt')
 print(IRV1.last_linear)
 plt.figure(figsize=(10, 5))
 plt.title("FRT Loss During Training")
